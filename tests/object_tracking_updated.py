@@ -7,71 +7,99 @@ Created on Sun Oct 23 12:00:57 2022
 """
 
 
+"""
+This script will track all detected object in the scene based on the location change of the objects in the scene
+
+procedure:
+
+  OBJECT detection:
+     1. The objects are detected using yolov7 object detection model
+     2. The bounding box and class details will be saved for tracking the objects
+  Tracking:
+     1. The tracker keeps tracks of the previous object location
+     2. In next frame the new object ID will be derived from the previous object location (based on the nearest object location ) 
+
+
+"""
+
+
+import math
+
 
 import copy       
+import time
+
+from pathlib import Path
+import numpy as np
+
+import cv2
+import torch
+import torch.backends.cudnn as cudnn
+from numpy import random
+import argparse
+
+from models.experimental import attempt_load
+from utils.datasets import LoadStreams, LoadImages
+from utils.general import check_img_size, check_requirements, check_imshow, non_max_suppression, apply_classifier, \
+    scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
+
+from utils.plots import plot_one_box
+from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
+
 
 def is_close(x0y0,x1y1,threshold):
-    
-    if abs(x0y0[0]-x1y1[0])<threshold and abs(x0y0[1]-x1y1[1])<threshold:
+    """
+    This method will check the closeness of  centres of two objects
+    x0y0: centre (x,y) of object0
+    x1y1:centre (x,y) of object1
+    threshold: The maximum distance (in pixels) two points can have, if the centres are greater than this threshold then these objects are considered as different.
+               
+    """  
+    dist=math.sqrt( (x1y1[0] - x0y0[0])**2 + (x1y1[1] - x0y0[1])**2 )
+    #dist=math.dist(x0y0,x1y1)
+    #if abs(x0y0[0]-x1y1[0])<threshold and abs(x0y0[1]-x1y1[1])<threshold:
+    if dist<threshold:
         return True
     else:
         return False
     
 def get_label(old_objects,centre):
-    th=25
-    th_l=7
-    match_count=0
-    label=-1
-    no_stop=True
+    """
+    Identify the objects label from the old object record which is near to the centre point. 
+    old_objects: The dictionary contain object label(integer) as key and object centre (tuple x,y) as value
+    centre: The centre   
+    """
+    #print("get label")
+    #print(old_objects.keys())
+    th=25   # the maximum distance allowed in pixel
+    th_l=1  # the minimum distance  allowed to distinguish two objects
+    match_count=0  #the variable used to check whether the centre matching two objects or not
+    label=0   # label =0 not moified means not match found in from the object list, hence the current object is a new entry  
+    no_stop=True  #The variable used to stop the while iteration
     while no_stop and th>th_l: 
-        for key,value in old_objects.items():
+        for key,value in old_objects.items():   # the for loop used to check presence of close objects
             
-            if is_close(value,centre,th):
+            if is_close(value,centre,th):   # if close object found
                 #pass
-                label=int(key)
-                match_count+=1
-            if match_count>1:
-                label=-1
-                th-=1
-                break
-        else:
-            no_stop=False
+                label=int(key)  # get the label of close object
+                match_count+=1  # incriment matchcount
+            if match_count>1:   # if more than one object present near the centre point.
+                #label=0       # reset label
+                th-=1           # reduce threshold value to reduce closeness range for repeated search in the dictionary.   
+                break           # break for reduced closeness search
+        else:                   # if for loop completed without multiple entry in the dictionary, then it is time to break the search
+            no_stop=False       
     
-    if label==-1:  
-      label=max(old_objects.keys())+1
+    #if label==-1:                      # if no label found in the dictionary
+      #label=max(old_objects.keys())+1  # Then add a new key , which is not present in the dict
       #print("new_label="+str(label))                 
 
-    return label
+    return int(label)              
 
 
-def update_old_objects(old_objects,new_objects):
-    pass
 
 
-def detect(q,save_img=False):
-    
-    
-    import time
-    import argparse
-    import time
-    from pathlib import Path
-    import numpy as np
-
-    import cv2
-    import torch
-    import torch.backends.cudnn as cudnn
-    from numpy import random
-
-
-    from models.experimental import attempt_load
-    from utils.datasets import LoadStreams, LoadImages
-    from utils.general import check_img_size, check_requirements, check_imshow, non_max_suppression, apply_classifier, \
-        scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
-
-    from utils.plots import plot_one_box
-    from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
-    
-    
+def detect(save_img=False):
     
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
@@ -105,7 +133,6 @@ def detect(q,save_img=False):
         modelc.load_state_dict(torch.load('weights/resnet101.pt', map_location=device)['model']).to(device).eval()
 
     # Set Dataloader
-    vid_path, vid_writer = None, None
     if webcam:
         view_img = check_imshow()
         cudnn.benchmark = True  # set True to speed up constant image size inference
@@ -125,9 +152,6 @@ def detect(q,save_img=False):
 
     t0 = time.time()
     
-    car=[]
-    truck=[]
-    bus=[]
     
     dummy_objects=[]
     for _ in range(len(names)):
@@ -136,7 +160,8 @@ def detect(q,save_img=False):
     old_objects=copy.deepcopy(dummy_objects)
     new_objects=copy.deepcopy(dummy_objects)
     
-    count=np.zeros(len(names),dtype=np.uint)
+    count=np.zeros(len(names),dtype=np.uint)   # this will incriment the count for each class to create new able for new objects
+    temp_count=copy.deepcopy(count)
     fr_count=0
     for path, img, im0s, vid_cap in dataset:
         img = torch.from_numpy(img).to(device)
@@ -154,103 +179,78 @@ def detect(q,save_img=False):
                 model(img, augment=opt.augment)[0]
 
         # Inference
-        t1 = time_synchronized()
         pred = model(img, augment=opt.augment)[0]
-        t2 = time_synchronized()
+
 
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
-        t3 = time_synchronized()
 
         # Apply Classifier
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
         
-        frames=[]
-        
-        if fr_count>=10:  
+        if fr_count>10:  
           new_objects=copy.deepcopy(dummy_objects)
+          fr_count=0
         fr_count+=1
         
         # Process detections
+        #print("AKHIL pred count:"+str(len(pred)))
         for i, det in enumerate(pred):  # detections per image
+            #print("AKHIL det count:"+str(len(det)))
             if webcam:  # batch_size >= 1
                 p, s, im0, frame = path[i], '%g: ' % i, im0s[i].copy(), dataset.count
             else:
                 p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
 
             p = Path(p)  # to Path
-            save_path = str(save_dir / p.name)  # img.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-            ident=np.zeros((80))
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
-
-                
-                # Print results
-                for c in det[:, -1].unique():
-                    n = (det[:, -1] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-                    ident[c.cpu().detach().numpy().astype('uint8')]=n.cpu().detach().numpy().astype('uint8')
-                    #print(c.cpu().detach().numpy().astype('uint8'))
                    
                 # Write results
                 
                 for *xyxy, conf, cls in reversed(det):
-                    if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
-                        with open(txt_path + '.txt', 'a') as f:
-                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
-
-                    if save_img or view_img :  # Add bbox to image
-                        label = f'{names[int(cls)]} {conf:.2f}'
-                        print("AKHIL")
-                        #print(int(cls))
-                        #print(im0.shape)
-                        x=xyxy
-                        c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
-                        centre=(c1[0]+((c2[0]-c1[0])//2),c2[1]+((c1[1]-c2[1])//2))
-                        im0=cv2.circle(im0, centre, 5, (255,50,50), 5)
+                    label = f'{names[int(cls)]} {conf:.2f}'
+                    #print("AKHIL")
+                    #print(int(cls))
+                    #print(count[int(cls)])
+                    #print(im0.shape)
+                    #print(old_objects[int(cls)].keys())
+                    x=xyxy
+                    c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
+                    centre=(c1[0]+((c2[0]-c1[0])//2),c2[1]+((c1[1]-c2[1])//2))
+                    im0=cv2.circle(im0, centre, 5, (255,50,50), 5)
+                    r_id=0
+                    if len(old_objects[int(cls)])==0:
+                        temp_count[int(cls)]+=1
+                        new_objects[int(cls)].update({temp_count[int(cls)]:centre})
                         
-                        if len(old_objects[int(cls)])==0:
-                            new_objects[int(cls)].update({count[int(cls)]:centre})
-                            count[int(cls)]+=1
-                        else:
-                            count[int(cls)]=get_label(old_objects[int(cls)],centre)
-                            new_objects[int(cls)].update({count[int(cls)]:centre})
+                    else:
+                        r_id=get_label(old_objects[int(cls)],centre)
+                        if r_id==0:
+                            temp_count[int(cls)]+=1
+                            r_id=temp_count[int(cls)]
+                            new_objects[int(cls)].update({temp_count[int(cls)]:centre})
+                        else:  
+                           #print(cls)
+                           #print(count[int(cls)])
+                           #print(old_objects[int(cls)].keys())
+                           old_objects[int(cls)].pop(r_id)  
+                           
+                           new_objects[int(cls)].update({r_id:centre})
                         #print(count)
-                        label=names[int(cls)]+" "+str(count[int(cls)])
-                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
-                #old_objects.update(new_objects)
-                #old_objects=new_objects.copy()
-                
-                #print(old_objects)
-                #print(new_objects) 
-            #frames.append(ident)
-            
-            # Print time (inference + NMS)
-            #print(det[:,-1])
-            #print(ident)
-            #car.append(ident[2])
-            #truck.append(ident[7])
-            #bus.append(ident[5])
-            q.put(ident)
-            #time.sleep(0.1)
-            print(s);
-            #print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
 
-            # Stream results
+                    label=names[int(cls)]+" "+str(r_id)
+                    plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+
         if view_img:
             cv2.imshow(str(p), im0)
             cv2.waitKey(1)  # 1 millisecond
         old_objects=copy.deepcopy(new_objects)
-        print("#######")
-
-
-
+        count=copy.deepcopy(temp_count)
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
         #print(f"Results saved to {save_dir}{s}")
@@ -258,101 +258,9 @@ def detect(q,save_img=False):
     print(f'Done. ({time.time() - t0:.3f}s)')
 
 
-import multiprocessing
-
-
-def plot_f(q):
-    import time
-    import matplotlib.pyplot as plt
-    
-    plt.ion()    
-    fig,ax=plt.subplots(3,2,figsize=(6,6))
-    car=[]
-    truck=[]
-    bus=[]
-    while True:
-        while not q.empty():
-           ident=q.get()
-           car.append(ident[2])
-           truck.append(ident[7])
-           bus.append(ident[5])
-        else:
-             print("q empty")
-       
-        item_c=len(car)
-        if item_c>200:
-            # car.pop(0)
-            # bus.pop(0)
-            # truck.pop(0)
-            ov=item_c-200
-            car=car[ov:]
-            bus=bus[ov:]
-            truck=truck[ov:]
-        
-        
-        ax[0,0].plot(car,'r-')
-        ax[0,0].set_ylabel("car")
-        ax[0,0].set_xlabel("time")
-        ax[0,1].boxplot(car)
-        
-        ax[1,0].plot(truck,'g-')
-        ax[1,0].set_ylabel("truck")
-        ax[1,1].boxplot(car)
-        
-        ax[2,0].plot(bus,'b-')
-        ax[2,0].set_ylabel("bus")
-        ax[2,1].boxplot(car)
-        
-        
-        
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        time.sleep(0.1) 
-        ax[0,0].clear()
-        ax[1,0].clear()
-        ax[2,0].clear()
-        ax[0,1].clear()
-        ax[1,1].clear()
-        ax[2,1].clear()
-
-
-
-def task1(opt,q):
-    import time
-
-    import time
-    from pathlib import Path
-    import numpy as np
-
-    import cv2
-    import torch
-    import torch.backends.cudnn as cudnn
-    from numpy import random
-
-
-    from models.experimental import attempt_load
-    from utils.datasets import LoadStreams, LoadImages
-    from utils.general import check_img_size, check_requirements, check_imshow, non_max_suppression, apply_classifier, \
-        scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
-
-    from utils.plots import plot_one_box
-    from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
-    
-    with torch.no_grad():
-        if opt.update:  # update all models (to fix SourceChangeWarning)
-            for opt.weights in ['yolov7.pt']:
-                detect(q)
-                strip_optimizer(opt.weights)
-        else:
-            
-            detect(q) 
-
-
-
 
 
 if __name__ == '__main__':
-    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='yolov7.pt', help='model.pt path(s)')
     parser.add_argument('--source', type=str, default='inference/images', help='source')  # file/folder, 0 for webcam
@@ -373,17 +281,18 @@ if __name__ == '__main__':
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
     opt = parser.parse_args()
-    print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
-    q=multiprocessing.Queue()
-    p1=multiprocessing.Process(target=task1,args=(opt,q,))
-    p2=multiprocessing.Process(target=plot_f,args=(q,))
+
+   
+    with torch.no_grad():
+       if opt.update:  # update all models (to fix SourceChangeWarning)
+           for opt.weights in ['yolov7.pt']:
+               detect()
+               strip_optimizer(opt.weights)
+       else:
+           
+           detect() 
     
-    p1.start()
-    p2.start()
-    print("process started")
-    p1.join()
-    p2.join()
   
 
 
