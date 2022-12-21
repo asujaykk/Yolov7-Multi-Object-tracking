@@ -96,7 +96,7 @@ class tracker:
             x=xyxy
             c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
             centre=(c1[0]+((c2[0]-c1[0])//2),c2[1]+((c1[1]-c2[1])//2))
-            im0=cv2.circle(im0, centre, 5, (255,50,50), 5)
+            #im0=cv2.circle(im0, centre, 5, (255,50,50), 5)
             r_id=0
             if len(self.old_objects[int(cls)])==0:
                 self.temp_count[int(cls)]+=1
