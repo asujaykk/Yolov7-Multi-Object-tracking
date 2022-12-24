@@ -18,11 +18,12 @@ The track method accept two parameter
     2. The detection output of the detector (bbox,confidence,class)
        bbox=[x1,y1,x2,y2]
            
-           x1,y1= lower left corner
-           x2,y2= upper top corner
-           
+           x1,y1= upper left corner
+           x2,y2= Lower right corner
+
+          ex:[532., 299., 554., 318.]           
     IMPORTANT:        x2>x1
-                      y1>y2
+                      y2>y1
 """
 
 import cv2  
@@ -68,11 +69,12 @@ class tracker:
             The detection output of the detector (bbox,confidence,class)
                bbox=[x1,y1,x2,y2]
                    
-                   x1,y1= lower left corner
-                   x2,y2= upper top corner
-                   
-            IMPORTANT:        x2>x1
-                              y1>y2
+           x1,y1= upper left corner
+           x2,y2= Lower right corner
+
+          ex:[532., 299., 554., 318.]           
+    IMPORTANT:        x2>x1
+                      y2>y1
 
         Returns
         -------
@@ -95,7 +97,7 @@ class tracker:
             #print(im0.shape)
             x=xyxy
             c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
-            centre=(c1[0]+((c2[0]-c1[0])//2),c2[1]+((c1[1]-c2[1])//2))
+            centre=(c1[0]+((c2[0]-c1[0])//2),c1[1]+((c2[1]-c1[1])//2))
             #im0=cv2.circle(im0, centre, 5, (255,50,50), 5)
             r_id=0
             if len(self.old_objects[int(cls)])==0:

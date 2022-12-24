@@ -7,7 +7,7 @@ Created on Wed Dec 21 17:13:23 2022
 """
 
 """
-This is the tracker class which is used to tracke the object detected by the yolo detector
+This is the tracker class which is used to track the object detected by the yolo detector
 
 
 The constructor accept two parameter:
@@ -19,11 +19,12 @@ The track method accept two parameter
     2. The detection output of the detector (bbox,confidence,class)
        bbox=[x1,y1,x2,y2]
            
-           x1,y1= lower left corner
-           x2,y2= upper top corner
-           
+           x1,y1= upper left corner
+           x2,y2= Lower right corner
+
+          ex:[532., 299., 554., 318.]           
     IMPORTANT:        x2>x1
-                      y1>y2
+                      y2>y1
 """
 
 import cv2  
@@ -53,7 +54,7 @@ class tracker:
         
         self.old_objects=copy.deepcopy(self.dummy_objects) # create old object dictionary list
         self.new_objects=copy.deepcopy(self.dummy_objects) # create new object dictionary list
-        
+        self.missed_objects=copy.deepcopy(self.dummy_objects) # create missed object dictionary list
         
         self.count=np.zeros(self.class_count,dtype=np.uint)  #create a numpy array with class size (with zero intialized) used to keep the new label for any new object for each class.
         self.temp_count=copy.deepcopy(self.count)            #create a numpy array with class size (with zero intialized) used to keep the new label for any new object for each class.
@@ -69,11 +70,13 @@ class tracker:
             The detection output of the detector (bbox,confidence,class)
                bbox=[x1,y1,x2,y2]
                    
-                   x1,y1= lower left corner
-                   x2,y2= upper top corner
-                   
-            IMPORTANT:        x2>x1
-                              y1>y2
+           x1,y1= upper left corner
+           x2,y2= Lower right corner
+
+          ex:[532., 299., 554., 318.]   
+          
+    IMPORTANT:        x2>x1
+                      y2>y1
 
         Returns
         -------
@@ -99,12 +102,12 @@ class tracker:
             #print(im0.shape)
             
             #x is bounding box of the detected object
-            #c1 : lower left corner point of bbox
-            #c2 : upper right corner of bbox
+            #c1 : Upper left corner point of bbox
+            #c2 : Lower right corner of bbox
             #centre : centre point of bbox
             x=xyxy
             c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3])) 
-            centre=(c1[0]+((c2[0]-c1[0])//2),c2[1]+((c1[1]-c2[1])//2))
+            centre=(c1[0]+((c2[0]-c1[0])//2),c1[1]+((c2[1]-c1[1])//2))
             
             # dynamic pixel threshold (bbox diagonal distance) for near by object search 
             # The search area will be reduced if the object size reduce/object moving far away in the scene
@@ -133,6 +136,12 @@ class tracker:
 
             label=self.names[int(cls)]+" "+str(r_id)   # create label string
             result.append((xyxy,label,int(cls)))       # append the result for each detection
+        
+        """
+        The following method need to be called before updating "old_objects" with "new_objects"
+        because "cleanup_missed_objects" method update "new_objects" internally
+        """
+        self.cleanup_missed_objects()      # clean objects missing for 7 frames(mfc)                                         
         self.old_objects=copy.deepcopy(self.new_objects)  # replace old objects with new objects
         self.count=copy.deepcopy(self.temp_count)      # replace class count with new class counts from temp_count
         return result  # return detection with new id for plotting
@@ -188,4 +197,33 @@ class tracker:
           #label=max(self.old_objects[cls].keys())+1  # Then add a new key , which is not present in the dict
           #print("new_label="+str(label))                 
 
-        return int(label)              
+        return int(label)   
+
+    def cleanup_missed_objects(self):
+        """
+        This method added to solve 
+          1. Copy un-detected objects from "old_objects" to "new_objects" if they missed only for a few frames (<mfc)
+          2. Clean up the objects which are not detected upto 7 frames (mfc)
+        
+        """
+        temp_objects=copy.deepcopy(self.dummy_objects)      # a new list of dictionary to track the missed objects (key=object_lable , value= how long they are missing (number of frames))
+        for cls in range(self.class_count):                 # iterate for all class type objects
+            if len(self.old_objects[cls])==0:               # If objects no entries in a class type then continue
+                continue
+            
+            for key, value in self.old_objects[cls].items():  #iterate through all items in a class
+
+                if key in self.missed_objects[cls].keys():    #If the missed item in current frame was already part of missed objects 
+                    v=self.missed_objects[cls].get(key)       # get how long it was missed (frame count)
+                    if v<self.mfc:
+                       temp_objects[cls].update({key:v+1})    # incriment framecount for the missing object
+                       self.new_objects[cls].update({key:value})        # If the object mising in less than mfc then add this object to "new_objects" , which will be further copied to old object in track method
+                    else:
+                       self.missed_objects[cls].pop(key)        # If the object is missing for more than mfc then remove it (this statement only help to reduce linear search in line 216)
+                       
+                else:
+                    temp_objects[cls].update({key:1})           #If the object is missing in current frame, then add a new entry in "temp_object"
+                    self.new_objects[cls].update({key:value})   # Also copy this object to "new_object" so that it will be copied to old object in track method
+                
+        self.missed_objects=copy.deepcopy(temp_objects)        #Update missed_object from temp_object, this will help to filter objects detected after a miss.    
+                   
