@@ -57,7 +57,6 @@ class tracker:
         self.missed_objects=copy.deepcopy(self.dummy_objects) # create missed object dictionary list
         
         self.count=np.zeros(self.class_count,dtype=np.uint)  #create a numpy array with class size (with zero intialized) used to keep the new label for any new object for each class.
-        self.temp_count=copy.deepcopy(self.count)            #create a numpy array with class size (with zero intialized) used to keep the new label for any new object for each class.
         
     def track(self,im0,det):   
         """
@@ -85,13 +84,13 @@ class tracker:
             [bbox,label(string),class]
 
         """
-        #The new object dictionary should be cleared after 10 frames to remove missed objects 
+        #The new object dictionary should be cleared after each frames.
         #the following if condition take care of that 
-        
-        if self.fr_count>=self.mfc:    
-          self.new_objects=copy.deepcopy(self.dummy_objects)
-          self.fr_count=0
-        self.fr_count+=1
+        self.new_objects=copy.deepcopy(self.dummy_objects)
+        # if self.fr_count>=self.mfc:    
+        #   self.new_objects=copy.deepcopy(self.dummy_objects)
+        #   self.fr_count=0
+        # self.fr_count+=1
            
         # Write results
         result=[]
@@ -116,15 +115,15 @@ class tracker:
             #im0=cv2.circle(im0, centre, 5, (255,50,50), 5)
             r_id=0  # r_id=0 means new object other wise it will be updated by get_label method
             if len(self.old_objects[int(cls)])==0:   # for first frame or if there is no entry was stored for a particular class earlier then store all objects with distict ids
-                self.temp_count[int(cls)]+=1         # Store id for the current objects
-                self.new_objects[int(cls)].update({self.temp_count[int(cls)]:centre})  # add new object with id and centre
+                self.count[int(cls)]+=1         # Store id for the current objects
+                self.new_objects[int(cls)].update({self.count[int(cls)]:centre})  # add new object with id and centre
                 
             else:  # if there is an entry in old object  
                 r_id=self.get_label(int(cls),centre,threshold)  # serach for nearest object based on the current object centre
                 if r_id==0:                                     # if the returned id==0 then this object is a new one
-                    self.temp_count[int(cls)]+=1                # incriment class countas for a new entry
-                    r_id=self.temp_count[int(cls)]              # change r_id to new id
-                    self.new_objects[int(cls)].update({self.temp_count[int(cls)]:centre})  #add new object
+                    self.count[int(cls)]+=1                # incriment class countas for a new entry
+                    r_id=self.count[int(cls)]              # change r_id to new id
+                    self.new_objects[int(cls)].update({self.count[int(cls)]:centre})  #add new object
                 else:                                           # if the object had a match from the old objects
                    #print(cls)
                    #print(count[int(cls)])
@@ -143,7 +142,6 @@ class tracker:
         """
         self.cleanup_missed_objects()      # clean objects missing for 7 frames(mfc)                                         
         self.old_objects=copy.deepcopy(self.new_objects)  # replace old objects with new objects
-        self.count=copy.deepcopy(self.temp_count)      # replace class count with new class counts from temp_count
         return result  # return detection with new id for plotting
     
     def is_close(self,x0y0,x1y1,threshold):
@@ -208,7 +206,7 @@ class tracker:
         """
         temp_objects=copy.deepcopy(self.dummy_objects)      # a new list of dictionary to track the missed objects (key=object_lable , value= how long they are missing (number of frames))
         for cls in range(self.class_count):                 # iterate for all class type objects
-            if len(self.old_objects[cls])==0:               # If objects no entries in a class type then continue
+            if len(self.old_objects[cls])==0:               # If no object entries in a class type then continue
                 continue
             
             for key, value in self.old_objects[cls].items():  #iterate through all items in a class
