@@ -110,7 +110,7 @@ class tracker:
             
             # dynamic pixel threshold (bbox diagonal distance) for near by object search 
             # The search area will be reduced if the object size reduce/object moving far away in the scene
-            threshold=math.sqrt( (c1[0] - c2[0])**2 + (c1[1] - c2[1])**2 ) 
+            threshold=int((math.sqrt( (c1[0] - c2[0])**2 + (c1[1] - c2[1])**2 ))/2.00)
             
             #im0=cv2.circle(im0, centre, 5, (255,50,50), 5)
             r_id=0  # r_id=0 means new object other wise it will be updated by get_label method
@@ -121,7 +121,7 @@ class tracker:
             else:  # if there is an entry in old object  
                 r_id=self.get_label(int(cls),centre,threshold)  # serach for nearest object based on the current object centre
                 if r_id==0:                                     # if the returned id==0 then this object is a new one
-                    self.count[int(cls)]+=1                # incriment class countas for a new entry
+                    self.count[int(cls)]+=1                # incriment class count for a new entry
                     r_id=self.count[int(cls)]              # change r_id to new id
                     self.new_objects[int(cls)].update({self.count[int(cls)]:centre})  #add new object
                 else:                                           # if the object had a match from the old objects
