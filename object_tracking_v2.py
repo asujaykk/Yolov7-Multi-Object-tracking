@@ -4,10 +4,8 @@
 Created on Sun Oct 23 12:00:57 2022
 
 @author: akhil_kk
-"""
 
 
-"""
 This script will track all detected object in the scene based on the location change of the objects in the scene
 
 procedure:
@@ -42,7 +40,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
-from tracker_v2 import tracker
+from tracker_v3 import tracker
 
 
 
@@ -142,12 +140,11 @@ def detect(save_img=False):
 
                 # track the objects based on the history
                 #the tracker will return bbox and the label of the tracked objects and new label for new objects
-                new_det = tracker_m.track(im0,det)
-  
+                new_det = tracker_m.track(im0,det) 
                 #plotiing the result from the tracker
                 for xyxy, label, cls in new_det:
                    plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
-        
+                   
         if view_img:
             cv2.imshow(str(p), im0)
             cv2.waitKey(1)  # 1 millisecond
