@@ -35,19 +35,25 @@ class object:
     def get_match_score(self,obj):
         """
         This method will check for object match
+        First the class will be compared
+        1. if the classes are matching then proceed for iou and dist calculation (because iou and dist claculation introduce a bit overhead)
+        2. If the class is not matching then provide a non match output
         
         numpy array of match score will be returned. match score format =[class_match,distance,IOU]
         
         """
         
-        if self.cls==obj.cls:     
+        if self.cls==obj.cls:       #if the classes are matching then proceed for iou and dist calculation (because iou and dist claculation introduce a bit overhead)
            cls_match=0.00
+           dist=object.get_closeness(self.centre, obj.centre)
+           iou= object.get_iou(self.bbox,obj.bbox)
 
         else:
            cls_match=1.00   # cls_match=1 indicate not matching
+           dist=500.00      # dist= distance between the two object (a large value to indicate not matching)
+           iou=1.00         # iou = inverted intersection of union (1-iou)
 
-        dist=object.get_closeness(self.centre, obj.centre)
-        iou= object.get_iou(self.bbox,obj.bbox)        
+        
         #result.append(pred_match)
         return np.array([cls_match,dist,iou],dtype=np.float32)  # numpy array of match score will be returned
         
@@ -148,17 +154,26 @@ class object:
         """
         check whether the match score is within the threshold limit
         
+        1. first check for class match if they are not matching then no need to compare the remaining  (to save time)
+        
+        Return True if the match score is withing the threshold limit
+        return False if the match score not withing the threshold limit
         """
-                
-        if np.all(np.less(match,threshold)): # if class matches then check for all matchings
-            return True
+        
+        if match[0]<threshold[0]: # class matching
+        
+            if np.all(np.less(match,threshold)): # if class matches then check for all matchings
+                return True
+            else:
+                return False
         else:
-            return False
-
+             return False
          
     @staticmethod
     def get_best_match(match1,match2): 
-        """        
+        """
+        
+
         Parameters
         ----------
         match1 : numpy array of object match score
