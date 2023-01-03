@@ -36,12 +36,21 @@ from object import object
 
 class tracker:
     
-    def __init__(self,names,mfc=7):
+    def __init__(self,names,mfc=7,max_dist=None,min_iou=0.5):
         """
         The constructor accept two parameter:
             1. The class name list as input
             2. maximum frame count to keep missed objects (default=7 frames)
+            3. min_dist: maximum distance (in pixels) of movement object centre allowed between consequtive frames to consider they are same object.
+                if None: dynamic threshold will be used (the threshold will be set based on the previous object size )
+            4. minimum inter section of union required to consider two detections are similar
+               value between 0-1 
+               0-> lowest iou (lower value of iou cause lower performance due to lot of matches)
+               1-> maximum iou (higher value cause minimum matches and lead to poor tracking )
         """
+        
+        
+        
         self.mfc=mfc                 
         self.names=names
         self.class_count=len(names)   # the label count
@@ -54,9 +63,21 @@ class tracker:
         
         self.count=np.zeros(self.class_count,dtype=np.uint)  #create a numpy array with class size (with zero intialized) used to keep the new label for any new object for each class.
         
+        if max_dist==None:           
+            self.dynamic_th=True     # if max_dist is set to None then dynamic thresholding will be adapted in tracker method
+            max_dist=1.00            # initialize max_dist with a dummy value
+        else:
+            self.dynamic_th=False    # if a valu set for max dist then dynmic threshold will be disabled and provided threshold will be used for all matching
+            
+
+        object.initialize_matcher_threshold(np.array([0.5,max_dist,1.00-min_iou]))
+        
     def track(self,im0,det):   
+        
         self.im0=im0
         self.fr_count +=1
+        if self.fr_count==1196:
+          print("frame: "+str(self.fr_count))
         """
         this method will track the object 
         Parameters
@@ -130,14 +151,29 @@ class tracker:
 
 
     def find_match_for_old_objects(self):
+        """
+        This method identify best match for all old objects from self.temp_objects
+        The match wil be saved in self.old_new_matches dictionary
+        
+        dict content will be as follows
+         
+        key:   old_object_label 
+        value: [new_object_label,match_score]
+            
+        Returns
+        -------
+        None.
+
+        """
         self.old_new_matches={}
         new_old_matches={}
-        threshold=np.array([0.5,1.00,0.50]) #threshold for checking the matching
+        threshold=object.match_thresholds #threshold for checking the matching
         
         # find old object to new matches
         for old_key,old_obj in self.old_objects.items():  
             best_match=[]
-            threshold[1]=old_obj.threshold   # update neareset object seraching limit from old object parameter
+            if self.dynamic_th:                  # only if dynamic threshold set to True (max_dist=None)
+                threshold[1]=old_obj.threshold   # update neareset object seraching limit from old object parameter
             
             
             for new_key,new_obj in self.temp_objects.items():
@@ -166,7 +202,7 @@ class tracker:
                                self.old_new_matches.update({old_key:best_match}) # add new match 
                                new_old_matches.update({new_key:[old_key,match_score]})   # update new_old_matches with new key and old_obj and match score
                            else:
-                               pass                                         #else dont touch the best match
+                               best_match=[]                                        #else dont change history. But clear best match for next iteration
                            
                         
                         else:                                  # new key do not have a match with old objects
@@ -176,9 +212,7 @@ class tracker:
                    else:                                          # If there was already a match then compare and get best match
                         res=object.get_best_match(best_match[1],match_score) # compare current score and prev score
                         if res==2 :                              #if best match is match_score or new_match then update the matches 
-                           new_old_matches.pop(best_match[0])    # remove earlier entry for new_old_match
-                           best_match=[new_key,match_score]      # then update best match
-                           
+
                            
                            if new_key in new_old_matches.keys():  # new key have already a match with old objects
                               """
@@ -193,20 +227,55 @@ class tracker:
                               oldkey_score = new_old_matches.get(new_key)
                               res=object.get_best_match(oldkey_score[1],match_score) # compare current score and prev score
                               if res==2:                                        # it says new match is better than earlier match
+                                  
+                                  new_old_matches.pop(best_match[0])    # remove earlier entry for new_old_match by taking old Id from previous best_match
+                                  best_match=[new_key,match_score]      # then update best match
+                                
                                   self.old_new_matches.pop(oldkey_score[0])         # remove earlier match from old_new_matches
                                   self.old_new_matches.update({old_key:best_match})   # add new match 
                                   new_old_matches.update({new_key:[old_key,match_score]})   # update new_old_matches with new key and old_obj and match score
                               else:
-                                  pass                                         #else dont touch the best match
+                                  """
+                                  Here old object (Lets say O1) have best match with the new object (lest say N2 ) compared to previous new object (lets say N2)
+                                  
+                                  ie:  O1-N1 match < O1-N2 match
+                                  
+                                  and  N2 have best match with another old object (lets say O2) compared to O1.
+                                  
+                                  ie: O1-N2 match< O2-N2 match
+                                  
+                                  
+                                  We cannot pair O1 with N2, even though O1-N1 match  < O1-N2 match.
+                                  Hence O1 will be paired with N1 only ie earlier best_match value will be considered as best.
+                                                                 
+                                  """
+                                  pass                                         #else dont touch the best_match
                               
                            
                            else:                                  # new key  do not have a match with old objects
+                               
+                               """
+                               ie:  O1-N1 match < O1-N2 match and N2 dont have any other match.
+                               
+                               so pair O1 with N2
+                               """
+                            
+                               new_old_matches.pop(best_match[0])    # remove earlier entry for new_old_match by taking new Id from previous best_match
+                               
+                               best_match=[new_key,match_score]      # then update best_match with new matched id and score for next iteration
+                               
                                new_old_matches.update({new_key:[old_key,match_score]})
                                self.old_new_matches.update({old_key:best_match})  # add new match 
                            
                            
                         else:
-                            pass                     #else dont touch the best match
+                            """
+                            ie:  O1-N1 match > O1-N2 match.
+                            
+                            so no need to modify earlier match
+                            Best_match will be kept as like that
+                            """
+                            pass                     #else dont touch the best_match
                            
 
                    

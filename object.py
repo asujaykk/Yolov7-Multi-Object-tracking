@@ -9,14 +9,36 @@ import math
 import numpy as np
 
 class object:
-    
+    """
+    The object class for handling each object
+       
+    """
     prev_f=None
     curr_f=None
     count=None
-
+    #the threshold for match_score
+    
+    match_thresholds=np.array([0.5,1.00,0.50])  # dummy value for matching threshold 
    
     def __init__(self,img,bbox,conf,cls):
-         
+         """
+        Object constructor
+        Parameters
+        ----------
+        img : numpy array
+            The current image which is being processed
+        bbox : tuple (x,y,x,y)
+            boundingbox of the object in the image
+        conf : float
+            class confidence of this object
+        cls : int
+            represent the class id of the object
+
+        Returns
+        -------
+        None.
+
+        """
          self.bbox=bbox
          self.cls=cls
          c1, c2 = (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3]))
@@ -60,8 +82,21 @@ class object:
         
     
     def update_object(self,obj):
+        """
+        The old objects will be updated from the new detections
+
+        Parameters
+        ----------
+        obj : object
+            The object from which the parameters to be updated.
+
+        Returns
+        -------
+        None.
+
+        """
         #save old properties to hist
-        self.hist=np.append(self.hist,obj.hist,axis=0)
+        #self.hist=np.append(self.hist,obj.hist,axis=0)
         
         #copy properties from new obj to existing obj
         self.bbox=obj.bbox
@@ -88,10 +123,8 @@ class object:
 
 
     @classmethod
-    def initialize_object_parameters(class_count):
-        count=np.zeros(class_count,dtype=np.uint)  #create a numpy array with class size (with zero intialized) used to keep the new label for any new object for each class.
-        pass
-
+    def initialize_matcher_threshold(cls,match_threshold):
+        cls.match_thresholds=match_threshold   # to update the threshold limit of object class
 
     @staticmethod
     def get_iou(boxA,boxB):
