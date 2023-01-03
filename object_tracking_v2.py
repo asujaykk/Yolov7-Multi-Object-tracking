@@ -47,8 +47,8 @@ from tracker_v3 import tracker
 def detect(save_img=False):
     
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
-    source = '/home/akhil_kk/WORKING_PROJECT/computer_vision/DATASET/Road_traffic_video.mp4'
-    view_img=True
+    #source = '/home/akhil_kk/WORKING_PROJECT/computer_vision/DATASET/Road_traffic_video.mp4'
+    #view_img=True
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
