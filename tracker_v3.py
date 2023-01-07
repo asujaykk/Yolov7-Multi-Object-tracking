@@ -13,6 +13,8 @@ This is the tracker class which is used to track the object detected by the yolo
 The constructor accept two parameter:
     1. The class name list as input
     2. maximum frame count to keep missed objects (default=7 frames)
+    3. max_dist: maximum distance (in pixels) of movement object centre allowed between consequtive frames to consider they are same object.
+       if None: dynamic threshold will be used (the threshold will be set based on the previous object size ) 
 
 The track method accept two parameter
     1. Input image
@@ -31,25 +33,30 @@ The track method accept two parameter
 import copy
 import numpy as np
 import math 
-from object import object 
+from object_v2 import object 
 
 
 class tracker:
     
-    def __init__(self,names,mfc=7,max_dist=None,min_iou=0.5):
+    def __init__(self,names,sel_classes=None,mfc=10,max_dist=None):
         """
         The constructor accept two parameter:
             1. The class name list as input
-            2. maximum frame count to keep missed objects (default=7 frames)
-            3. min_dist: maximum distance (in pixels) of movement object centre allowed between consequtive frames to consider they are same object.
+            2. The classes to be selectively tracked : 
+                default=None track all available class objects 
+                or a list of index (integer) of class bject to be tracked.               
+                example: [2,3,4] Then tracker only track object of class 2,3 and 4
+                
+            3. maximum frame count to keep missed objects (default=10 frames)
+            4. max_dist: maximum distance (in pixels) of movement object centre allowed between consequtive frames to consider they are same object.
                 if None: dynamic threshold will be used (the threshold will be set based on the previous object size )
-            4. minimum inter section of union required to consider two detections are similar
-               value between 0-1 
-               0-> lowest iou (lower value of iou cause lower performance due to lot of matches)
-               1-> maximum iou (higher value cause minimum matches and lead to poor tracking )
+
         """
-        
-        
+        if sel_classes == None:  # if selective classes not provided, then disable selective track
+           self.sel_tracking=False
+        else:            
+            self.sel_tracking=True           
+        self.sel_classes=sel_classes 
         
         self.mfc=mfc                 
         self.names=names
@@ -69,15 +76,16 @@ class tracker:
         else:
             self.dynamic_th=False    # if a valu set for max dist then dynmic threshold will be disabled and provided threshold will be used for all matching
             
-
-        object.initialize_matcher_threshold(np.array([0.5,max_dist,1.00-min_iou]))
+        #initialize object class variable   
+        #This is a threshold variable used for filtering objects those have best match probability.
+        # the object class method initialize_matcher_threshold is used for this purpose
+        object.initialize_matcher_threshold(max_dist)
         
     def track(self,im0,det):   
         
+        object.update_curr_frame(im0) # update current frame in object class (will be used for Histogram comparison)
         self.im0=im0
         self.fr_count +=1
-        if self.fr_count==1196:
-          print("frame: "+str(self.fr_count))
         """
         this method will track the object 
         Parameters
@@ -103,19 +111,19 @@ class tracker:
             [bbox,label(string),class]
 
         """
-        det=det.cpu().detach().numpy().astype('int32')
-        self.new_objects={}
-        self.create_temp_objects(im0,det)
-        self.find_match_for_old_objects()
-        self.update_and_move_old_objects_to_new_objects()
-        self.find_and_update_new_objects()
+        det=det.cpu().detach().numpy().astype('float32')   # detach tensors to numpy
+        self.new_objects={}                             #make new_objects empty
+        self.create_temp_objects(im0,det)               #create temporary objects from new detections with unique temporary id.
+        self.find_match_for_old_objects()               # find best match for all old objects from temporary objects 
+        self.update_and_move_old_objects_to_new_objects()  #move old objects to new_object by updating their new location and parameters
+        self.find_and_update_new_objects()              # find and update if any new object added to the scene
         
-        result=self.get_label_and_bbox_for_plotiing()
+        result=self.get_label_and_bbox_for_plotiing()   # find detection for all objects in the current frame with updated label
         
-        self.clean_and_update_missed_objects()                                     
-        self.old_objects=copy.deepcopy(self.new_objects)  # replace old objects with new objects
+        self.clean_and_update_missed_objects()          # clean missed objects
+        self.old_objects=copy.deepcopy(self.new_objects)  # replace old objects with new objects for next stage
         
-        return result  # return detection with new id for plotting
+        return result  # return detection with new id for plotting/further application
 
     def create_temp_objects(self,im0,detections):
         """
@@ -144,10 +152,13 @@ class tracker:
         obj_c=0
         for *xyxy, conf, cls in reversed(detections):
             
-            bbox=xyxy
+            if self.sel_tracking:                     # if selective tracking enabled           
+                if cls not in self.sel_classes:       # then skip object of classes that are not part of sel_classes
+                    continue
+            bbox=[int(item) for item in xyxy]  #convert bbox points to ints
             obj_c+=1
             label=str(obj_c)+"_"+self.names[int(cls)]  # create label that do not conflict with old object label
-            self.temp_objects.update({label:object(im0,bbox,conf,int(cls))})
+            self.temp_objects.update({label:object(im0,bbox,conf,int(cls))})  # add all temp objects to temp_objects dictionary
 
 
     def find_match_for_old_objects(self):
@@ -173,13 +184,13 @@ class tracker:
         for old_key,old_obj in self.old_objects.items():  
             best_match=[]
             if self.dynamic_th:                  # only if dynamic threshold set to True (max_dist=None)
-                threshold[1]=old_obj.threshold   # update neareset object seraching limit from old object parameter
+                threshold[1]=old_obj.threshold   # update neareset object seraching limit from old object parameter (close range to search)
             
             
             for new_key,new_obj in self.temp_objects.items():
                 
                 match_score=old_obj.get_match_score(new_obj)
-                if object.is_matching(match_score,threshold):        # if old obejct and new objects matches
+                if object.is_matching(match_score,threshold):        # if old obejct and new objects matches (cla and closeness: first level filtering) 
 
                    if len(best_match)==0:                            # if there was no match earlier for old object
                         best_match=[new_key,match_score]
@@ -354,7 +365,7 @@ class tracker:
         result=[]
         for key,obj in self.new_objects.items():
             #self.im0=cv2.circle(self.im0, obj.centre, 2, (255,50,50), 2)
-            result.append((obj.bbox,key,obj.cls))
+            result.append((obj.bbox,obj.conf,obj.cls,key))
         
         return result
         

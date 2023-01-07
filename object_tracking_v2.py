@@ -40,7 +40,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
-from tracker_v3 import tracker
+from tracker_v4 import tracker
 
 
 
@@ -100,9 +100,12 @@ def detect(save_img=False):
     t0 = time.time()
     
     #Create a tracker object for tracking  (The constructor need list of class label as input)
-    tracker_m = tracker(names)
+    sel_classes=None    # selective tracking : list of claases to be tracked, if None then all class objects are tracked 
+    # sel_classes=[2,7]     # selective tracking : list of claases to be tracked, only provided class objects are tracked 
+    tracker_m = tracker(names,sel_classes)  # 
     
     for path, img, im0s, vid_cap in dataset:
+        str_time=time.time()
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -144,10 +147,14 @@ def detect(save_img=False):
                 #the tracker will return bbox and the label of the tracked objects and new label for new objects
                 new_det = tracker_m.track(im0,det) 
                 #plotiing the result from the tracker
-                for xyxy, label, cls in new_det:
+                for xyxy,conf,cls,label in new_det:
                    plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
                    
         if view_img:
+            t_diff=time.time()-str_time
+            txt="Speed: "+str(int(1.00/t_diff))+" fps"
+            #print(txt)
+            cv2.putText(im0, txt, (10,40), cv2.FONT_HERSHEY_SIMPLEX,1, (255,0,0))
             cv2.imshow(str(p), im0)
             cv2.waitKey(1)  # 1 millisecond
 

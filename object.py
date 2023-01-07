@@ -5,9 +5,10 @@ Created on Wed Dec 21 21:49:55 2022
 
 @author: akhil_kk
 """
+
 import math
 import numpy as np
-
+import cv2
 class object:
     """
     The object class for handling each object
@@ -18,7 +19,11 @@ class object:
     count=None
     #the threshold for match_score
     
-    match_thresholds=np.array([0.5,1.00,0.50])  # dummy value for matching threshold 
+    #match threshold is an np array, this will be set by the tracker during initialization
+    #match_threshold = [class_thresold,max_dist]  
+    # class_threshold =0.5 , 
+    # max_dist=in pixels (max distance allowed between two object centres to consider them as close)
+    match_thresholds=None # dummy value for matching threshold  
    
     def __init__(self,img,bbox,conf,cls):
          """
@@ -39,8 +44,9 @@ class object:
         None.
 
         """
+         self.conf=conf
          self.bbox=bbox
-         self.cls=cls
+         self.cls=int(cls)
          c1, c2 = (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3]))
          self.c1=c1
          self.c2=c2
@@ -51,6 +57,7 @@ class object:
          threshold=(math.sqrt( (c1[0] - c2[0])**2 + (c1[1] - c2[1])**2 ))/2.00
          self.threshold=threshold
 
+         
          #store the history of the object
          self.hist=np.array([[c1,c2,centre,threshold,cls]])     
          
@@ -69,15 +76,23 @@ class object:
            cls_match=0.00
            dist=object.get_closeness(self.centre, obj.centre)
            iou= object.get_iou(self.bbox,obj.bbox)
+           
+           if object.prev_f is not None:   # if there is a previous frame 
+               img1=object.get_croped_img(self.prev_f, self.bbox)  # get old object portion
+               img2=object.get_croped_img(self.curr_f, obj.bbox)   # get current object portion
+               hist=object.get_hist_match_score(img1,img2)    # get histogram match score between the objects
+           else:
+               hist=1.00    # for the first frame the histogram match should be 1, (no match)
 
         else:
            cls_match=1.00   # cls_match=1 indicate not matching
            dist=500.00      # dist= distance between the two object (a large value to indicate not matching)
            iou=1.00         # iou = inverted intersection of union (1-iou)
+           hist=1.00
 
         
         #result.append(pred_match)
-        return np.array([cls_match,dist,iou],dtype=np.float32)  # numpy array of match score will be returned
+        return np.array([cls_match,dist,iou,hist],dtype=np.float32)  # numpy array of match score will be returned
         
         
     
@@ -99,23 +114,90 @@ class object:
         #self.hist=np.append(self.hist,obj.hist,axis=0)
         
         #copy properties from new obj to existing obj
+        self.conf=obj.conf
         self.bbox=obj.bbox
         self.c1=obj.c1
         self.c2=obj.c2
         self.centre=obj.centre
         self.threshold=obj.threshold
     
-      
-    def get_hist_match(self):
-        pass
+    
+    @staticmethod
+    def get_croped_img(img,bbox):
+        cropped_image = img[bbox[1]:bbox[3],bbox[0]:bbox[2]]
+        return cropped_image  
+    
+    
+    
+    @staticmethod  
+    def get_hist_match_score(img1,img2,comp_method=3):
+        """
+        
+        This method calculate the histogram match between two images/objects. 
 
+        Parameters
+        ----------
+        img1 : numpy array
+            image 1 to be compared
+        img2 : numpy array
+            image2 to be compared
+        comp_method : TYPE, optional
+            DESCRIPTION. The default is 3.
+            This is the method used by open cv for histogram comaparison
+             0 - Correlation  : value range= 0-1    : 1 = best match 0=least match
+             1 - Chi-square   : least value is best match (float value)
+             2 - Intersection : max value is best match (float value)
+             3 - Bhattacharyya  :value range= 0-1    : 0 = best match 1=least match
+
+        Returns
+        -------
+        match_score : float
+            DESCRIPTION.
+            score represent the match between two images (depends on the comp_method used)
+            
+
+        """
+        hsv_test1 = cv2.cvtColor(img1, cv2.COLOR_BGR2HSV)
+        hsv_test2 = cv2.cvtColor(img2, cv2.COLOR_BGR2HSV)
+        h_bins = 70
+        s_bins = 80
+        histSize = [h_bins, s_bins]
+        # hue varies from 0 to 179, saturation from 0 to 255
+        h_ranges = [0, 180]
+        s_ranges = [0, 256]
+        ranges = h_ranges + s_ranges # concat lists
+        # Use the 0-th and 1-st channels
+        channels = [0, 1]
+        hist_test1 = cv2.calcHist([hsv_test1], channels, None, histSize, ranges, accumulate=False)
+        cv2.normalize(hist_test1, hist_test1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+        hist_test2 = cv2.calcHist([hsv_test2], channels, None, histSize, ranges, accumulate=False)
+        cv2.normalize(hist_test2, hist_test2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+        
+        match_score = cv2.compareHist(hist_test1, hist_test2,comp_method)
+        return match_score
 
 
     def get_opt_flow_match(self):
+        """
+        reserved for future: to calculate opt flow match
+
+        Returns
+        -------
+        None.
+
+        """
         pass
 
 
-    def get_pred_loc(self):       
+    def get_pred_loc(self): 
+        """
+        Reserved for future: to calculate predicted location match (kalman filter)
+
+        Returns
+        -------
+        None.
+
+        """
         if np.shape(self.hist)[0]>10:
             return None
         else:
@@ -123,9 +205,25 @@ class object:
 
 
     @classmethod
-    def initialize_matcher_threshold(cls,match_threshold):
-        cls.match_thresholds=match_threshold   # to update the threshold limit of object class
+    def initialize_matcher_threshold(cls,max_dist):
+        """
+        Method to set threshold for first level filterring of close objects
+        
+        """
+        cls.match_thresholds=np.array([0.5,max_dist])   # to update the threshold limit of object class
 
+
+    @classmethod
+    def update_curr_frame(cls,img):
+        
+        """
+        Update old frame with current frame
+        and then update current frame with new frame or function argument
+        """
+        cls.prev_f=object.curr_f
+        cls.curr_f=img
+        
+    
     @staticmethod
     def get_iou(boxA,boxB):
         """
@@ -195,7 +293,7 @@ class object:
         
         if match[0]<threshold[0]: # class matching
         
-            if np.all(np.less(match,threshold)): # if class matches then check for all matchings
+            if np.all(np.less(match[:1],threshold[:1])): # if class matches then check for closeness
                 return True
             else:
                 return False
@@ -205,8 +303,6 @@ class object:
     @staticmethod
     def get_best_match(match1,match2): 
         """
-        
-
         Parameters
         ----------
         match1 : numpy array of object match score
@@ -232,7 +328,7 @@ class object:
         else:
             return 0
                
-            
+
         
 
     
