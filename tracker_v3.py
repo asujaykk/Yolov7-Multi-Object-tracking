@@ -33,7 +33,7 @@ The track method accept two parameter
 import copy
 import numpy as np
 import math 
-from object import object 
+from MultiObjectTracker.object import object 
 
 
 class tracker:
@@ -54,9 +54,10 @@ class tracker:
         """
         if sel_classes == None:  # if selective classes not provided, then disable selective track
            self.sel_tracking=False
+           self.sel_classes=None
         else:            
             self.sel_tracking=True           
-        self.sel_classes=sel_classes 
+            self.sel_classes=[names.index(item) for item in sel_classes]
         
         self.mfc=mfc                 
         self.names=names
