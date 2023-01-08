@@ -40,7 +40,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
-from tracker_v4 import tracker
+from tracker_v3 import tracker
 
 
 
