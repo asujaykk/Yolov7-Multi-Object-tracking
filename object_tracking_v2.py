@@ -100,9 +100,9 @@ def detect(save_img=False):
     t0 = time.time()
     
     #Create a tracker object for tracking  (The constructor need list of class label as input)
-    sel_classes=None    # selective tracking : list of claases to be tracked, if None then all class objects are tracked 
-    # sel_classes=[2,7]     # selective tracking : list of claases to be tracked, only provided class objects are tracked 
-    tracker_m = tracker(names,sel_classes)  # 
+    sel_classes=None        # selective tracking : list of claases to be tracked, if None then all class objects are tracked 
+    #sel_classes=['bus','truck']     # selective tracking : list of claases to be tracked, only provided class objects are tracked 
+    tracker_m = tracker(names,sel_classes)  #create tracker object for tracking 
     
     for path, img, im0s, vid_cap in dataset:
         str_time=time.time()
