@@ -56,6 +56,9 @@ python3 object_tracking_v2.py --source <path_to_video_file or 0 for webcam> --vi
 ```
 In this mode the tracker try to track all available objects in the scene. A small GIF provided here to show the result.The interface of 'object_tracking_v2.py' is adapted from "detect.py" of  'WongKinYiu/yolov7' repo.
 
+![20230114_175044](https://user-images.githubusercontent.com/78997596/212471386-ea2e6883-1807-4dc1-b826-60d159886882.gif)
+
+
 ### 3.2. Selective tracking mode. 
 To use the tracker in Selective mode, please set 'sel_classes' variable  to ['bus','truck'] in 'object_tracking_v2.py' as shown below.
 
