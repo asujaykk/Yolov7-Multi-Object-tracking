@@ -12,14 +12,14 @@ This detector is capable of detecting 80 types(classes) of objects. And also it 
 The tracker process the detections of the current frame and  identify the best matches for the objects from the previous frame. The matched objects will get the unique identification from the previous objects. The tracker also need to clear missed object and add new entries as video progress. We are using 'MultiObjcetTracker' package for this purpose. 
 This tracker can be integrated to an object detection code with very mnimal code change and very minimal interface parameters.
 
-The user instructions and interface details of 'MultiObjcetTracker' is explained in this repository: https://github.com/asujaykk/MultiObjectTracker.git
+The interface details of 'MultiObjcetTracker' is explained in this repository: https://github.com/asujaykk/MultiObjectTracker.git
 
 ## 3. How to run object tracker demo?
 This object tracker is designed to work with 'yolov7 object detector', but it can be used with any object detector by formating the output of object detector to make it compatable with 'tracker.track()' method.
 The expected parameter format of 'tracker.track()' method explained here(https://github.com/asujaykk/MultiObjectTracker.git). 
 So if you are using any other object detection model then please convert the detection output to the supported format before passing to 'tracker.track()' method.
 
-1. As a first step clone this repository (its a stripped copy of  'WongKinYiu/yolov7' repository only for inferenec) to your working directory with below command.
+1. As a first step clone this repository (its a stripped copy of  'https://github.com/WongKinYiu/yolov7.git' repository only for inferenec) to your working directory with below command.
 ```
   git clone https://github.com/asujaykk/Yolov7-Multi-Object-tracking.git
 ```
@@ -56,7 +56,7 @@ Then run the following command to start yolov7 MO-tracker,
 ```
 python3 object_tracking_v2.py --source <path_to_video_file or 0 for webcam> --view-img
 ```
-In this mode the tracker try to track all available objects in the scene. A small GIF provided here to show the result.The interface of 'object_tracking_v2.py' is adapted from "detect.py" of  'WongKinYiu/yolov7' repo.
+In this mode the tracker try to track all available objects in the scene. A small GIF provided here to show the result.The interface of 'object_tracking_v2.py' is adapted from "detect.py" of  'https://github.com/WongKinYiu/yolov7.git' repo.
 
 ![20230114_180531](https://user-images.githubusercontent.com/78997596/212471881-ef36965b-9b33-4224-88c2-3b04d7b43b0f.gif)
 
@@ -71,7 +71,7 @@ Then run the following command to start yolov7 MO-tracker,
 ```
 python3 object_tracking_v2.py --source <path_to_video_file or 0 for webcam> --view-img
 ```
-In this mode the tracker track only 'truck' in the scene. A small GIF provided here to show the result.The interface of 'object_tracking_v2.py' is adapted from "detect.py" of  'WongKinYiu/yolov7' repo.
+In this mode the tracker track only 'truck' in the scene. A small GIF provided here to show the result.The interface of 'object_tracking_v2.py' is adapted from "detect.py" of  'https://github.com/WongKinYiu/yolov7.git' repo.
 
 ![20230114_180801](https://user-images.githubusercontent.com/78997596/212471897-14de6a24-1c21-4a09-a978-7eacb830c811.gif)
 
@@ -83,3 +83,6 @@ In this mode the tracker track only 'truck' in the scene. A small GIF provided h
 3. Accident detection.
 4. Environment monitoring for self driving cars.
 5. Object tracking drones.
+
+
+
