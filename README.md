@@ -56,17 +56,21 @@ python3 object_tracking_v2.py --source <path_to_video_file or 0 for webcam> --vi
 ```
 In this mode the tracker try to track all available objects in the scene. A small GIF provided here to show the result.The interface of 'object_tracking_v2.py' is adapted from "detect.py" of  'WongKinYiu/yolov7' repo.
 
-![20230114_175044](https://user-images.githubusercontent.com/78997596/212471386-ea2e6883-1807-4dc1-b826-60d159886882.gif)
+![20230114_180531](https://user-images.githubusercontent.com/78997596/212471881-ef36965b-9b33-4224-88c2-3b04d7b43b0f.gif)
+
 
 
 ### 3.2. Selective tracking mode. 
-To use the tracker in Selective mode, please set 'sel_classes' variable  to ['bus','truck'] in 'object_tracking_v2.py' as shown below.
+To use the tracker in Selective mode, please set 'sel_classes' variable  to ['truck'] in 'object_tracking_v2.py' as shown below.
 
 Then run the following command to start yolov7 MO-tracker,
 ```
 python3 object_tracking_v2.py --source <path_to_video_file or 0 for webcam> --view-img
 ```
-In this mode the tracker track only 'cars' and 'buses' in the scene. A small GIF provided here to show the result.The interface of 'object_tracking_v2.py' is adapted from "detect.py" of  'WongKinYiu/yolov7' repo.
+In this mode the tracker track only 'truck' in the scene. A small GIF provided here to show the result.The interface of 'object_tracking_v2.py' is adapted from "detect.py" of  'WongKinYiu/yolov7' repo.
+
+![20230114_180801](https://user-images.githubusercontent.com/78997596/212471897-14de6a24-1c21-4a09-a978-7eacb830c811.gif)
+
 
 
 ## Aplications.
