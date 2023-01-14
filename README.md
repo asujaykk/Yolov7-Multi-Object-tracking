@@ -49,6 +49,8 @@ The tracker can be used in two modes they are:
 
 ### 3.1. Normal tracking mode. 
 To use the tracker in normal mode, please set 'sel_classes' variable  to 'None' in 'object_tracking_v2.py' as shown below.
+![Screenshot_20230114-182546](https://user-images.githubusercontent.com/78997596/212472599-7e27714d-1363-4d5d-9ee4-021891a37da0.jpg)
+
 
 Then run the following command to start yolov7 MO-tracker,
 ```
@@ -62,6 +64,8 @@ In this mode the tracker try to track all available objects in the scene. A smal
 
 ### 3.2. Selective tracking mode. 
 To use the tracker in Selective mode, please set 'sel_classes' variable  to ['truck'] in 'object_tracking_v2.py' as shown below.
+
+![Screenshot_20230114-182439](https://user-images.githubusercontent.com/78997596/212472643-e1877830-59a7-4740-8980-1e65b0e45a80.jpg)
 
 Then run the following command to start yolov7 MO-tracker,
 ```
