@@ -79,7 +79,7 @@ In this mode the tracker track only 'truck' in the scene. A small GIF provided h
 
 ## Aplications.
 1. Traffic monitoring.
-2. Vehicle spped detection from traffic camera.
+2. Vehicle speed detection from traffic camera.
 3. Accident detection.
 4. Environment monitoring for self driving cars.
 5. Object tracking drones.
